@@ -118,7 +118,7 @@ enum OpCode: Int {
     }
 }
 
-func Run(program:inout [Int], output:inout Int, userinput: (()->Int)? = nil) {
+func Run(program:inout [Int], output:(Int)->Void, userinput: (()->Int)? = nil) {
     var idx = 0
     repeat {
         // To get individual digits from an int we need to convert to base10
@@ -170,7 +170,7 @@ func Run(program:inout [Int], output:inout Int, userinput: (()->Int)? = nil) {
 
         let res = code.execute(values, idx: idx, userinput: userinput)
         if res.storein == -2 {
-            output = res.result
+            output(res.result)
         }
         if res.storein >= 0 {
             program[res.storein] = res.result
@@ -183,8 +183,8 @@ func Run(program:inout [Int], output:inout Int, userinput: (()->Int)? = nil) {
 }
 
 class Thruster {
+    var sem = DispatchSemaphore(value: 0)
     var inputs = [0,0]
-    var output = 0
     
     init(phase: Int) {
         self.inputs[0] = phase
@@ -193,8 +193,17 @@ class Thruster {
     func run(program:[Int], ret: (Int)->Void) {
         var p = program
         var idx = 0
-        Run(program: &p, output: &output) { let res = self.inputs[idx]; idx += 1; return res }
-        ret(output)
+        // set the input semaphore to indicate the input for 'phase' is available to be read
+        // See: https://lists.apple.com/archives/cocoa-dev/2014/Apr/msg00484.html for what can
+        // happen if you create a semaphore with an initial value of 1 🤷🏻‍♂️
+        sem.signal()
+        Run(program: &p, output: ret) {
+            self.sem.wait()
+            let res = self.inputs[idx]
+            idx = 1
+            return res
+            }
+        // ret(output)
     }
 }
 
@@ -205,17 +214,38 @@ extension Array where Element:Thruster {
     }
 
     func run(program:[Int]) -> Int {
-        var finalval = -1
+        // Create a DispatchGroup to let our thruster computers run concurrently rather
+        // than in sequence
+        let group = DispatchGroup()
+
         for (n,thruster) in self.enumerated() {
-            thruster.run(program:program) { output in 
-                if n < self.count-1 {
-                    self[n+1].inputs[1] = output
-                } else {
-                    finalval = output
+            group.enter()
+            DispatchQueue.global().async {
+                thruster.run(program:program) { output in 
+                    if n < self.count-1 {
+                        self[n+1].inputs[1] = output
+                        self[n+1].sem.signal()
+                    } else {
+                        // To support the feedback loop for part 2, store the
+                        // output from the final thruster in the chain back
+                        // in to the fist thruster's input. Final value will always
+                        // come from this location whether running in feedback loop
+                        // mode or not.
+                        self[0].inputs[1] = output
+                        self[0].sem.signal()
+                    }
                 }
+                group.leave()
             }
         }
-        return finalval
+
+        // Append the semaphore for the original thruster as it was already initialised
+        // with the original input value
+        self[0].sem.signal()
+
+        // Wait for the dispatch group to finish all queued tasks
+        group.wait()
+        return self[0].inputs[1]
     }
 }
 
@@ -245,9 +275,8 @@ func part1() {
     for combination in combinations {
         let thrusters = Array<Thruster>(phases: combination)
         results.append(thrusters.run(program: program))
-        print("Completed combination \(combination)")
     }
-    print("Highest signal to thrusters = \(results.max()!)")
+    print("Part 1:\n\tHighest signal to thrusters = \(results.max()!)")
 }
 
 guard p1unitTests() else {
