@@ -183,7 +183,7 @@ func Run(program:inout [Int], output:(Int)->Void, userinput: (()->Int)? = nil) {
     } while(idx < program.count)
 }
 
-class Thruster {
+class Amplifier {
     var sem = DispatchSemaphore(value: 0)
     var inputs = [0,0]
     
@@ -208,10 +208,10 @@ class Thruster {
     }
 }
 
-extension Array where Element:Thruster {
+extension Array where Element:Amplifier {
     @_semantics("array.init")
     init(phases:[Int]) {
-        self = phases.map(Thruster.init(phase:)) as! Array<Element>
+        self = phases.map(Amplifier.init(phase:)) as! Array<Element>
     }
 
     func run(program:[Int]) -> Int {
@@ -257,8 +257,8 @@ func p1unitTests() -> Bool {
         (prog: [3,31,3,32,1002,32,10,32,1001,31,-2,31,1007,31,0,33,1002,33,7,33,1,33,31,31,1,32,31,31,4,31,99,0,0,0], phases: [1,0,4,3,2], expect: 65210)
     ]
     for test in tests {
-        let thrusters = Array<Thruster>(phases: test.phases)
-        guard thrusters.run(program: test.prog) == test.expect else {
+        let amplifiers = Array<Amplifier>(phases: test.phases)
+        guard amplifiers.run(program: test.prog) == test.expect else {
             print("Unit test expecting value \(test.expect) from phases \(test.phases) failed")
             return false
         }
@@ -273,8 +273,8 @@ func p2unitTests() -> Bool {
         (prog: [3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54,-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4,53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10], phases: [9,7,8,5,6], expect: 18216)
     ]
     for test in tests {
-        let thrusters = Array<Thruster>(phases: test.phases)
-        guard thrusters.run(program: test.prog) == test.expect else {
+        let amplifiers = Array<Amplifier>(phases: test.phases)
+        guard amplifiers.run(program: test.prog) == test.expect else {
             print("Unit test expecting value \(test.expect) from phases \(test.phases) failed")
             return false
         }
@@ -291,10 +291,10 @@ func part1() {
     getPossibleThrusterCombinations(set: &combinations, from:[0,1,2,3,4])
     var results: [Int] = []
     for combination in combinations {
-        let thrusters = Array<Thruster>(phases: combination)
-        results.append(thrusters.run(program: program))
+        let amplifiers = Array<Amplifier>(phases: combination)
+        results.append(amplifiers.run(program: program))
     }
-    print("Part 1:\n\tHighest signal to thrusters = \(results.max()!)")
+    print("Part 1:\n\tHighest signal to amplifiers = \(results.max()!)")
 }
 
 func part2() {
@@ -302,10 +302,10 @@ func part2() {
     getPossibleThrusterCombinations(set: &combinations, from:[5,6,7,8,9])
     var results: [Int] = []
     for combination in combinations {
-        let thrusters = Array<Thruster>(phases: combination)
-        results.append(thrusters.run(program: program))
+        let amplifiers = Array<Amplifier>(phases: combination)
+        results.append(amplifiers.run(program: program))
     }
-    print("Part 2:\n\tHighest signal to thrusters = \(results.max()!)")
+    print("Part 2:\n\tHighest signal to amplifiers = \(results.max()!)")
 }
 
 guard p1unitTests(), p2unitTests() else {
