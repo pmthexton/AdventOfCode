@@ -13,16 +13,30 @@ enum Entry {
 }
 
 extension Array where Element == Entry {
+    func connectedToGear(near: Int) -> [Int] {
+        var found: [Int] = []
+        self.forEach {
+            switch $0 {
+                case .partNumber(let partNumber, let bounds, _):
+                    if (bounds.0 - 1) <= near,
+                        (bounds.1 + 1) >= near {
+                            found.append(partNumber)
+                        }
+                default:
+                    _ = 1
+            }
+        }
+        return found
+    }
+
     func hasSymbol(near: Entry) -> Bool {
         // for a possible part number on a vertically adjacent line, see if
         // the x1/x2 values fall within (x1-1)...(x1+1). So long as the min/max of
         // 0 and 9 from the input schematic are honured
         var found = false
-        var value: Int = 0
         var adjacentTo: (Int, Int)
         switch near {
-            case .partNumber(let val, let bounds, _):
-                value = val
+            case .partNumber(_, let bounds, _):
                 adjacentTo = bounds
             default:
                 adjacentTo = (-10, -10)
@@ -31,13 +45,9 @@ extension Array where Element == Entry {
 
         self.forEach {
             switch $0 {
-                case .symbol(let char, let x):
+                case .symbol(_, let x):
                     if x >= adjacentTo.0 - 1,
                        x <= adjacentTo.1 + 1 {
-                        // print("\(adjacentTo.0 - 1) > \(x) < \(adjacentTo.1 + 1)")
-                        // if value == 234 {
-                        //     print("Adding 234 based on char \(char) at index \(x), input range \(adjacentTo)")
-                        // }
                         found = true
                         break
                     }
@@ -67,9 +77,6 @@ extension Array where Element == [Entry] {
                 // index is fine. shrug.
                 let x2 = $0.distance(from: $0.startIndex, to: upperBound) - 1
                 if let partNumber = Int(substr) {
-                    // if partNumber == 234 {
-                    //     print("Creating 234 based on \(x1)-\(x2) and substr \(substr)")
-                    // }
                     symbols.append(Entry.partNumber(partNumber, (x1, x2), false))
                 } else {
                     symbols.append(Entry.symbol(String(substr), (x1)))
@@ -77,6 +84,33 @@ extension Array where Element == [Entry] {
             }
             return symbols
         }
+    }
+
+    func gearRatios() -> [Int] {
+        var ratios: [Int] = []
+        for (lineIdx, line) in enumerated() {
+            for(_, part) in line.enumerated() {
+                switch part {
+                    case .symbol(let char, let location):
+                        guard char == "*" else { continue }
+                        var connected = line.connectedToGear(near: location)
+                        if lineIdx > 0 {
+                            connected.append(contentsOf: self[lineIdx - 1].connectedToGear(near: location))
+                        }
+                        if lineIdx < self.count - 1 {
+                            connected.append(contentsOf: self[lineIdx + 1].connectedToGear(near: location))
+                        }
+                        guard connected.count == 2 else {
+                            print("Gear on line:location \(lineIdx):\(location) connected to \(connected.count) components")
+                            continue
+                        }
+                        ratios.append(connected[0] * connected[1])
+                    default:
+                        continue
+                }
+            }
+        }
+        return ratios 
     }
 
     func validPartNumbers() -> [Int] {
@@ -87,26 +121,16 @@ extension Array where Element == [Entry] {
                 switch part {
                     case .partNumber(let partNumber, let bounds, _):
                         if line.hasSymbol(near: part) {
-                            // if partNumber == 234 {
-                            //     print("Adding 234 from same line analysis")
-                            // }
                             lineEntries.append(partNumber)
                             continue
                         }
                         if lineIdx > 0 {
                             if self[lineIdx - 1].hasSymbol(near: part) {
-                                // if partNumber == 234 {
-                                // print("Adding 234 from previous line analysis")
-                                // }
                                 lineEntries.append(partNumber)
                                 continue
                             }
                         }
-                        // print("\(lineIdx) is less than \(self.count) ?)")
                         if lineIdx < (self.count - 1) {
-                            // if partNumber == 234 {
-                            //     print("Adding 234 from next line analysis")
-                            //     }
                             if self[lineIdx + 1].hasSymbol(near: part) {
                                 lineEntries.append(partNumber)
                                 continue
@@ -116,9 +140,7 @@ extension Array where Element == [Entry] {
                         _ = 1
                 }
             }
-            // if lineIdx == 87 {
-            //     print("Adding: \(lineEntries)")
-            // }
+
             found.append(contentsOf: lineEntries)
         }
 
@@ -169,3 +191,45 @@ func PartOne() {
 
 PartOne()
 
+func UnitTestTwp() {
+
+    let input = """
+    467..114..
+    ...*......
+    ..35..633.
+    ......#...
+    617*......
+    .....+.58.
+    ..592.....
+    ......755.
+    ...$.*....
+    .664.598..
+    """.lines 
+
+    let entries = [[Entry]].init(from: input)
+    let answer = entries.gearRatios().reduce(0, { $0 + $1 })
+    guard answer == 467835 else {
+        print("UnitTestTwo answer of \(answer) failed")
+        exit(EXIT_FAILURE)
+    }
+    print("UnitTestTwo passed")
+}
+
+UnitTestTwp()
+
+func PartTwo() {
+    let input = try! String(contentsOfFile: "day3input.txt").lines
+    let entries = [[Entry]].init(from: input)
+    let ratios = entries.gearRatios()
+    // print(validParts)
+    let answer = ratios.reduce(0, {$0 + $1})
+
+    guard answer == 86841457 else {
+        print("\(answer) is wrong. you've broken your implementation. git-revert!")
+        exit(EXIT_FAILURE)
+    }
+    
+    print("Part Two Answer: \(answer)")
+}
+
+PartTwo()
